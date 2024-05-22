@@ -17,6 +17,7 @@ func (FixedWindow) New(cfg Config) fiber.Handler {
 		mux        = &sync.RWMutex{}
 		max        = strconv.Itoa(cfg.Max)
 		expiration = uint64(cfg.Expiration.Seconds())
+		lckout     = uint64(cfg.Lockout.Seconds())
 	)
 
 	// Create manager to simplify storage operations ( see manager.go )
@@ -56,11 +57,11 @@ func (FixedWindow) New(cfg Config) fiber.Handler {
 		// Increment hits
 		e.currHits++
 
-		// Calculate when it resets in seconds
-		resetInSec := e.exp - ts
-
 		// Set how many hits we have left
 		remaining := cfg.Max - e.currHits
+
+		// Calculate when it resets in seconds
+		resetInSec := e.exp - ts
 
 		// Update storage
 		manager.set(key, e, cfg.Expiration)
@@ -70,6 +71,17 @@ func (FixedWindow) New(cfg Config) fiber.Handler {
 
 		// Check if hits exceed the cfg.Max
 		if remaining < 0 {
+			// Quando o usuario excede o limite
+			if remaining == -1 {
+				mux.Lock()
+				e = manager.get(key)
+				//Caso não haja restante adiciona a punição aqui
+				e.exp = ts + lckout
+				resetInSec = e.exp - ts
+				manager.set(key, e, cfg.Expiration)
+				mux.Unlock()
+			}
+
 			// Return response with Retry-After header
 			// https://tools.ietf.org/html/rfc6584
 			c.Set(fiber.HeaderRetryAfter, strconv.FormatUint(resetInSec, 10))
