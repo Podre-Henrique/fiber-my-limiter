@@ -56,6 +56,9 @@ type Config struct {
 	//
 	// Default: a new Fixed Window Rate Limiter
 	LimiterMiddleware Handler
+
+	// Puna o usuario quando ultrapassar o limite
+	Lockout time.Duration
 }
 
 // ConfigDefault is the default config
